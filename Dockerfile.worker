@@ -1,0 +1,47 @@
+FROM python:3.11.7-slim
+
+LABEL maintainer="Code Quality Inspector"
+LABEL description="Celery Worker for Code Quality Inspector"
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 시스템 패키지 업데이트 및 필수 도구 설치
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    ca-certificates \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 의존성 설치
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Claude CLI 설치 스크립트 복사 및 실행
+# 주의: 실제 Claude CLI 설치 방법에 따라 수정 필요
+COPY scripts/install_claude.sh /tmp/install_claude.sh
+RUN chmod +x /tmp/install_claude.sh && \
+    /tmp/install_claude.sh || echo "Claude CLI installation skipped (script failed)"
+
+# 애플리케이션 코드 복사
+COPY app /app/app
+COPY rules /app/rules
+
+# 작업 디렉토리 생성
+RUN mkdir -p /app/logs /tmp/code-inspection
+
+# Git 설정 (Celery Worker에서 Git 작업을 위해)
+RUN git config --global user.email "worker@code-inspector.local" && \
+    git config --global user.name "Code Inspector Worker"
+
+# 환경 변수 설정
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV C_FORCE_ROOT=true
+
+# 실행 명령 (Celery Worker)
+CMD ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info", "--concurrency=2"]

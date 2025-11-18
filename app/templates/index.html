@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .info-card h2 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .info-card p {
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .info-card code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .endpoints {
+            margin-top: 30px;
+        }
+
+        .endpoint {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+
+        .endpoint-method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 0.85em;
+            margin-right: 10px;
+        }
+
+        .method-post {
+            background: #28a745;
+            color: white;
+        }
+
+        .method-get {
+            background: #007bff;
+            color: white;
+        }
+
+        .endpoint-path {
+            font-family: 'Courier New', monospace;
+            color: #495057;
+        }
+
+        .endpoint-description {
+            margin-top: 8px;
+            color: #6c757d;
+            font-size: 0.95em;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .links {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .link-button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+
+        .link-button:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ app_name }}</h1>
+            <p>Automated Code Quality Inspection Service</p>
+            <span class="status-badge">✓ Service Running</span>
+        </div>
+
+        <div class="content">
+            <div class="info-card">
+                <h2>Welcome</h2>
+                <p>This service automatically inspects code quality for GitHub repositories using Claude AI.</p>
+                <p><strong>Version:</strong> {{ version }}</p>
+            </div>
+
+            <div class="info-card">
+                <h2>How It Works</h2>
+                <p>1. Send a POST request to <code>/api/inspect</code> with your GitHub repository URL</p>
+                <p>2. Receive a task ID immediately</p>
+                <p>3. Check task status using <code>/api/status/{task_id}</code></p>
+                <p>4. Get results via callback URL when inspection completes</p>
+            </div>
+
+            <div class="endpoints">
+                <h2 style="margin-bottom: 15px;">API Endpoints</h2>
+
+                <div class="endpoint">
+                    <div>
+                        <span class="endpoint-method method-get">GET</span>
+                        <span class="endpoint-path">/health</span>
+                    </div>
+                    <div class="endpoint-description">Health check endpoint</div>
+                </div>
+
+                <div class="endpoint">
+                    <div>
+                        <span class="endpoint-method method-post">POST</span>
+                        <span class="endpoint-path">/api/inspect</span>
+                    </div>
+                    <div class="endpoint-description">Create a new code inspection task</div>
+                </div>
+
+                <div class="endpoint">
+                    <div>
+                        <span class="endpoint-method method-get">GET</span>
+                        <span class="endpoint-path">/api/status/{task_id}</span>
+                    </div>
+                    <div class="endpoint-description">Check inspection task status</div>
+                </div>
+            </div>
+
+            <div class="links">
+                <a href="/docs" class="link-button">API Documentation</a>
+                <a href="/health" class="link-button">Health Check</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2025 Code Quality Inspector | Powered by Claude AI</p>
+        </div>
+    </div>
+</body>
+</html>
