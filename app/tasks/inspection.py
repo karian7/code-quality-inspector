@@ -8,11 +8,12 @@ import structlog
 from app.core.celery_app import celery_app
 from app.services.git_service import GitService
 from app.services.rule_loader import RuleLoader
-from app.services.inspector import CodeInspector
+from app.services.inspector import InspectorFactory
 from app.tasks.callbacks import CallbackService
 from app.core.exceptions import (
     GitCloneException,
-    ClaudeCliException,
+    AICliException,
+    APIKeyMissingException,
     RuleLoadException,
     CallbackException,
 )
@@ -32,6 +33,7 @@ def inspect_code_task(
     branch: str,
     callback_url: str,
     rules_files: List[str],
+    ai_provider: str = "codex",
     metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
@@ -42,6 +44,7 @@ def inspect_code_task(
         branch: 브랜치 이름
         callback_url: 결과 콜백 URL
         rules_files: 심사 규칙 파일 목록
+        ai_provider: AI 제공자 ("claude" 또는 "codex")
         metadata: 추가 메타데이터
 
     Returns:
@@ -55,12 +58,13 @@ def inspect_code_task(
         task_id=task_id,
         github_url=github_url,
         branch=branch,
+        ai_provider=ai_provider,
     )
 
     # 서비스 초기화
     git_service = GitService()
     rule_loader = RuleLoader()
-    inspector = CodeInspector()
+    inspector = InspectorFactory.create_inspector(ai_provider)
     callback_service = CallbackService()
 
     try:
@@ -98,6 +102,7 @@ def inspect_code_task(
             status="success",
             github_url=github_url,
             branch=branch,
+            ai_provider=ai_provider,
             result=inspection_result,
             metadata=metadata,
         )
@@ -114,6 +119,7 @@ def inspect_code_task(
                 status="failed",
                 github_url=github_url,
                 branch=branch,
+                ai_provider=ai_provider,
                 error=str(e),
                 error_type="git_clone_error",
                 metadata=metadata,
@@ -133,6 +139,7 @@ def inspect_code_task(
                 status="failed",
                 github_url=github_url,
                 branch=branch,
+                ai_provider=ai_provider,
                 error=str(e),
                 error_type="rule_load_error",
                 metadata=metadata,
@@ -142,8 +149,8 @@ def inspect_code_task(
 
         raise
 
-    except ClaudeCliException as e:
-        logger.error("claude_cli_failed", task_id=task_id, error=str(e))
+    except APIKeyMissingException as e:
+        logger.error("api_key_missing", task_id=task_id, ai_provider=ai_provider, error=str(e))
         # 콜백 전송 (실패)
         try:
             callback_service.send_callback_sync(
@@ -152,12 +159,33 @@ def inspect_code_task(
                 status="failed",
                 github_url=github_url,
                 branch=branch,
+                ai_provider=ai_provider,
+                error=str(e),
+                error_type="api_key_missing",
+                metadata=metadata,
+            )
+        except Exception as callback_error:
+            logger.exception("callback_failed_after_api_key_error", error=str(callback_error))
+
+        raise
+
+    except AICliException as e:
+        logger.error("ai_cli_failed", task_id=task_id, ai_provider=ai_provider, error=str(e))
+        # 콜백 전송 (실패)
+        try:
+            callback_service.send_callback_sync(
+                callback_url=callback_url,
+                task_id=task_id,
+                status="failed",
+                github_url=github_url,
+                branch=branch,
+                ai_provider=ai_provider,
                 error=str(e),
                 error_type="inspection_error",
                 metadata=metadata,
             )
         except Exception as callback_error:
-            logger.exception("callback_failed_after_claude_error", error=str(callback_error))
+            logger.exception("callback_failed_after_ai_cli_error", error=str(callback_error))
 
         raise
 
@@ -171,6 +199,7 @@ def inspect_code_task(
                 status="failed",
                 github_url=github_url,
                 branch=branch,
+                ai_provider=ai_provider,
                 error=str(e),
                 error_type="unexpected_error",
                 metadata=metadata,

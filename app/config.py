@@ -46,6 +46,16 @@ class Settings(BaseSettings):
     claude_max_tokens: int = 4096
     claude_timeout: int = 600  # 10분
 
+    # Codex CLI 설정
+    codex_cli_path: str = "codex"  # PATH에서 찾음
+    codex_api_key: Optional[str] = None  # OPENAI_API_KEY
+    codex_model: str = "gpt-4"
+    codex_max_tokens: int = 4096
+    codex_timeout: int = 600  # 10분
+
+    # AI 제공자 설정
+    default_ai_provider: str = "codex"  # claude 또는 codex
+
     # 작업 디렉토리 설정
     work_dir: Path = Path("/tmp/code-inspection")
     rules_dir: Path = Path("/app/rules")

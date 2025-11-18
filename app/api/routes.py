@@ -39,6 +39,7 @@ async def create_inspection(
                 "branch": request.branch,
                 "callback_url": str(request.callback_url),
                 "rules_files": request.rules_files,
+                "ai_provider": request.ai_provider,
                 "metadata": request.metadata,
             }
         )
@@ -48,6 +49,7 @@ async def create_inspection(
             task_id=task.id,
             github_url=str(request.github_url),
             branch=request.branch,
+            ai_provider=request.ai_provider,
         )
 
         return InspectionResponse(

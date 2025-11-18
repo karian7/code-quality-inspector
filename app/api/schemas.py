@@ -2,7 +2,7 @@
 API 요청/응답 스키마
 """
 from pydantic import BaseModel, HttpUrl, Field, field_validator
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 
 
@@ -30,6 +30,11 @@ class InspectionRequest(BaseModel):
         default=["quality_rules.md"],
         description="사용할 심사 규칙 파일 목록",
         examples=[["quality_rules.md", "security_rules.md"]],
+    )
+    ai_provider: Literal["claude", "codex"] = Field(
+        default="codex",
+        description="사용할 AI 제공자 (claude 또는 codex)",
+        examples=["codex"],
     )
     metadata: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -63,6 +68,7 @@ class InspectionRequest(BaseModel):
                 "branch": "main",
                 "callback_url": "https://api.example.com/webhook/inspection",
                 "rules_files": ["quality_rules.md"],
+                "ai_provider": "codex",
                 "metadata": {"project_id": "123", "user_id": "456"},
             }
         }
@@ -95,6 +101,7 @@ class CallbackPayload(BaseModel):
     status: str  # success, failed
     github_url: str
     branch: str
+    ai_provider: str  # 사용된 AI 제공자
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     error_type: Optional[str] = None
@@ -108,6 +115,7 @@ class CallbackPayload(BaseModel):
                 "status": "success",
                 "github_url": "https://github.com/user/repo",
                 "branch": "main",
+                "ai_provider": "codex",
                 "result": {
                     "score": 85,
                     "issues": [],

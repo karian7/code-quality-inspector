@@ -33,13 +33,25 @@ class GitCloneException(InspectorException):
         )
 
 
-class ClaudeCliException(InspectorException):
-    """Claude CLI 실행 실패 예외"""
+class AICliException(InspectorException):
+    """AI CLI 실행 실패 예외"""
 
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(
             message=message,
-            error_code="CLAUDE_CLI_FAILED",
+            error_code="AI_CLI_FAILED",
+            status_code=500,
+            details=details,
+        )
+
+
+class APIKeyMissingException(InspectorException):
+    """API 키 누락 예외"""
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            error_code="API_KEY_MISSING",
             status_code=500,
             details=details,
         )
