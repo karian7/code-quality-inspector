@@ -28,45 +28,6 @@ async def lifespan(app: FastAPI):
         version=settings.app_version,
     )
 
-    # Claude CLI 존재 및 API 키 확인
-    claude_cli_found = shutil.which(settings.claude_cli_path) is not None
-    if not claude_cli_found:
-        logger.warning("claude_cli_not_found", path=settings.claude_cli_path)
-    else:
-        logger.info("claude_cli_found", path=settings.claude_cli_path)
-
-        # Claude API 키 확인
-        if not settings.claude_api_key:
-            logger.warning(
-                "claude_api_key_not_configured",
-                message="Claude API key is not set. Claude provider will not be available.",
-            )
-        else:
-            logger.info("claude_api_key_configured")
-
-    # Codex CLI 존재 및 API 키 확인
-    codex_cli_found = shutil.which(settings.codex_cli_path) is not None
-    if not codex_cli_found:
-        logger.warning("codex_cli_not_found", path=settings.codex_cli_path)
-    else:
-        logger.info("codex_cli_found", path=settings.codex_cli_path)
-
-        # Codex API 키 확인
-        if not settings.codex_api_key:
-            logger.warning(
-                "codex_api_key_not_configured",
-                message="Codex API key is not set. Codex provider will not be available.",
-            )
-        else:
-            logger.info("codex_api_key_configured")
-
-    # 최소한 하나의 AI CLI는 사용 가능해야 함
-    if not claude_cli_found and not codex_cli_found:
-        error_msg = "No AI CLI found. Please install at least one: Claude CLI or Codex CLI"
-        logger.error("no_ai_cli_available", message=error_msg)
-        if not settings.debug:
-            raise RuntimeError(error_msg)
-
     # 시작 시 오래된 임시 디렉토리 정리
     try:
         from app.services.git_service import GitService

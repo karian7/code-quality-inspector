@@ -7,6 +7,7 @@ LABEL description="Celery Worker for Code Quality Inspector"
 WORKDIR /app
 
 # 시스템 패키지 업데이트 및 필수 도구 설치
+# Node.js와 npm 추가 설치
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -15,11 +16,21 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     libffi-dev \
     procps \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 의존성 설치
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Codex 설정 파일 복사
+RUN mkdir -p /root/.codex
+COPY scripts/codex/config.toml /root/.codex/config.toml
+
+# Entrypoint 스크립트 복사 (런타임에 auth.json 생성)
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # AI CLI 설치 스크립트 복사 및 실행
 # Claude CLI와 Codex CLI를 모두 설치
@@ -43,5 +54,9 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV C_FORCE_ROOT=true
 
+# Entrypoint 설정 (auth.json 생성 후 CMD 실행)
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
 # 실행 명령 (Celery Worker)
-CMD ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+# --include 옵션으로 태스크 모듈 명시적 지정
+CMD ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info", "--concurrency=2", "--include=app.tasks.inspection"]

@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     git_clone_depth: int = 1  # Shallow clone
 
     # Claude CLI 설정
-    claude_cli_path: str = "claude"  # PATH에서 찾음
+    claude_cli_path: str = "~/.local/bin/claude"  # PATH에서 찾음
     claude_api_key: Optional[str] = Field(
         default=None,
         validation_alias="ANTHROPIC_API_KEY"
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     codex_timeout: int = 600  # 10분
 
     # AI 제공자 설정
-    default_ai_provider: str = "codex"  # claude 또는 codex
+    default_ai_provider: str = "claude"  # claude 또는 codex
 
     # 작업 디렉토리 설정
     work_dir: Path = Path("/tmp/code-inspection")
