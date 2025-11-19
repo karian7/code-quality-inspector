@@ -3,12 +3,11 @@ AI CLI를 사용한 코드 검사 서비스 (SOLID 원칙 준수)
 """
 import subprocess
 import json
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, Any, Optional
 import structlog
-import tempfile
-import os
 
 from app.config import settings
 from app.core.exceptions import AICliException, APIKeyMissingException
@@ -46,8 +45,17 @@ class BaseInspector(ABC):
         pass
 
     @abstractmethod
-    def build_cli_command(self, code_dir: Path, prompt_file: str) -> list[str]:
-        """CLI 명령어 빌드"""
+    def build_cli_command(self, code_dir: Path, prompt: str) -> list[str]:
+        """
+        CLI 명령어 빌드
+
+        Args:
+            code_dir: 코드 디렉토리
+            prompt: 프롬프트 문자열 (명령줄 인자로 전달됨)
+
+        Returns:
+            CLI 명령어 리스트
+        """
         pass
 
     @abstractmethod
@@ -178,9 +186,12 @@ Please provide only the JSON output without any additional text or markdown form
         """
         CLI 실행
 
+        보안 샌드박스를 위해 체크아웃 받은 디렉토리(code_dir)에서 CLI를 실행합니다.
+        프롬프트는 명령줄 인자로 전달됩니다.
+
         Args:
-            code_dir: 코드 디렉토리
-            prompt: 프롬프트
+            code_dir: 코드 디렉토리 (CLI 실행 위치)
+            prompt: 프롬프트 (명령줄 인자로 전달)
 
         Returns:
             파싱된 JSON 결과
@@ -189,89 +200,82 @@ Please provide only the JSON output without any additional text or markdown form
             AICliException: CLI 실행 실패 시
         """
         try:
-            # 프롬프트를 임시 파일에 저장
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-                f.write(prompt)
-                prompt_file = f.name
+            # CLI 명령어 구성 (프롬프트를 명령줄 인자로 전달)
+            cmd = self.build_cli_command(code_dir, prompt)
 
-            try:
-                # CLI 명령어 구성
-                cmd = self.build_cli_command(code_dir, prompt_file)
+            # 환경 변수 설정
+            env = self.get_env_vars()
 
-                # 환경 변수 설정
-                env = self.get_env_vars()
+            logger.info(
+                "executing_ai_cli",
+                provider=self.get_provider_name(),
+                code_dir=str(code_dir),
+                prompt_length=len(prompt),
+                cmd_length=len(cmd),
+            )
 
-                logger.info("executing_ai_cli", provider=self.get_provider_name(), cmd=" ".join(cmd))
+            # CLI 실행 (체크아웃 받은 디렉토리에서 실행 - 보안 샌드박스)
+            result = subprocess.run(
+                cmd,
+                cwd=str(code_dir),
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+                env=env,
+            )
 
-                # CLI 실행
-                result = subprocess.run(
-                    cmd,
-                    cwd=str(code_dir),
-                    capture_output=True,
-                    text=True,
-                    timeout=self.timeout,
-                    env=env,
+            if result.returncode != 0:
+                logger.error(
+                    "ai_cli_failed",
+                    provider=self.get_provider_name(),
+                    returncode=result.returncode,
+                    stderr=result.stderr[:500] if result.stderr else None,
+                )
+                raise AICliException(
+                    f"{self.get_provider_name()} CLI execution failed with code {result.returncode}",
+                    details={
+                        "provider": self.get_provider_name(),
+                        "returncode": result.returncode,
+                        "stdout": result.stdout[:500] if result.stdout else None,
+                        "stderr": result.stderr[:500] if result.stderr else None,
+                    },
                 )
 
-                if result.returncode != 0:
-                    logger.error(
-                        "ai_cli_failed",
-                        provider=self.get_provider_name(),
-                        returncode=result.returncode,
-                        stderr=result.stderr,
-                    )
-                    raise AICliException(
-                        f"{self.get_provider_name()} CLI execution failed with code {result.returncode}",
-                        details={
-                            "provider": self.get_provider_name(),
-                            "returncode": result.returncode,
-                            "stdout": result.stdout,
-                            "stderr": result.stderr,
-                        },
-                    )
+            # 결과 파싱
+            output = result.stdout.strip()
 
-                # 결과 파싱
-                output = result.stdout.strip()
+            # JSON 추출 (마크다운 코드 블록 제거)
+            if "```json" in output:
+                output = output.split("```json")[1].split("```")[0].strip()
+            elif "```" in output:
+                output = output.split("```")[1].split("```")[0].strip()
 
-                # JSON 추출 (마크다운 코드 블록 제거)
-                if "```json" in output:
-                    output = output.split("```json")[1].split("```")[0].strip()
-                elif "```" in output:
-                    output = output.split("```")[1].split("```")[0].strip()
-
-                try:
-                    parsed_result = json.loads(output)
-                    return parsed_result
-                except json.JSONDecodeError as e:
-                    logger.error(
-                        "failed_to_parse_json",
-                        provider=self.get_provider_name(),
-                        output=output[:500],
-                        error=str(e),
-                    )
-                    # JSON 파싱 실패 시 기본 결과 반환
-                    return {
-                        "score": 0,
-                        "summary": "Failed to parse inspection result",
-                        "issues": [{
-                            "severity": "critical",
-                            "category": "parsing_error",
-                            "file": None,
-                            "line": None,
-                            "description": f"Failed to parse {self.get_provider_name()} CLI output: {str(e)}",
-                            "recommendation": "Check CLI output format",
-                        }],
-                        "strengths": [],
-                        "recommendations": [],
-                        "raw_output": output[:1000],
-                    }
-
-            finally:
-                # 임시 파일 삭제
-                try:
-                    os.unlink(prompt_file)
-                except:
-                    pass
+            try:
+                parsed_result = json.loads(output)
+                return parsed_result
+            except json.JSONDecodeError as e:
+                logger.error(
+                    "failed_to_parse_json",
+                    provider=self.get_provider_name(),
+                    output=output[:500],
+                    error=str(e),
+                )
+                # JSON 파싱 실패 시 기본 결과 반환
+                return {
+                    "score": 0,
+                    "summary": "Failed to parse inspection result",
+                    "issues": [{
+                        "severity": "critical",
+                        "category": "parsing_error",
+                        "file": None,
+                        "line": None,
+                        "description": f"Failed to parse {self.get_provider_name()} CLI output: {str(e)}",
+                        "recommendation": "Check CLI output format",
+                    }],
+                    "strengths": [],
+                    "recommendations": [],
+                    "raw_output": output[:1000],
+                }
 
         except subprocess.TimeoutExpired:
             logger.error("ai_cli_timeout", provider=self.get_provider_name(), timeout=self.timeout)
@@ -279,6 +283,9 @@ Please provide only the JSON output without any additional text or markdown form
                 f"{self.get_provider_name()} CLI execution timed out after {self.timeout} seconds",
                 details={"provider": self.get_provider_name(), "timeout": self.timeout},
             )
+
+        except AICliException:
+            raise
 
         except Exception as e:
             logger.exception("ai_cli_execution_error", provider=self.get_provider_name(), error=str(e))
@@ -307,14 +314,24 @@ class ClaudeInspector(BaseInspector):
     def get_provider_name(self) -> str:
         return "claude"
 
-    def build_cli_command(self, code_dir: Path, prompt_file: str) -> list[str]:
-        """Claude CLI 명령어 빌드"""
+    def build_cli_command(self, code_dir: Path, prompt: str) -> list[str]:
+        """
+        Claude CLI 명령어 빌드
+
+        Claude Code CLI 형식: claude -p "프롬프트"
+        체크아웃 받은 디렉토리(code_dir)에서 실행됩니다.
+
+        Args:
+            code_dir: 코드 디렉토리 (현재 작업 디렉토리로 설정됨)
+            prompt: 프롬프트 문자열
+
+        Returns:
+            CLI 명령어 리스트
+        """
         return [
             self.get_cli_path(),
-            "analyze",
-            str(code_dir),
-            "--prompt-file", prompt_file,
-            "--format", "json",
+            "-p",
+            prompt,
         ]
 
     def get_env_vars(self) -> dict:
@@ -344,14 +361,24 @@ class CodexInspector(BaseInspector):
     def get_provider_name(self) -> str:
         return "codex"
 
-    def build_cli_command(self, code_dir: Path, prompt_file: str) -> list[str]:
-        """Codex CLI 명령어 빌드"""
+    def build_cli_command(self, code_dir: Path, prompt: str) -> list[str]:
+        """
+        Codex CLI 명령어 빌드
+
+        Codex CLI 형식 (Claude와 유사): codex -p "프롬프트"
+        체크아웃 받은 디렉토리(code_dir)에서 실행됩니다.
+
+        Args:
+            code_dir: 코드 디렉토리 (현재 작업 디렉토리로 설정됨)
+            prompt: 프롬프트 문자열
+
+        Returns:
+            CLI 명령어 리스트
+        """
         return [
             self.get_cli_path(),
-            "inspect",
-            str(code_dir),
-            "--prompt", prompt_file,
-            "--output", "json",
+            "-p",
+            prompt,
         ]
 
     def get_env_vars(self) -> dict:

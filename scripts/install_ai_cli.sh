@@ -46,6 +46,43 @@ if command -v claude &> /dev/null; then
     echo "  Version: $(claude --version 2>&1 || echo 'unknown')"
 else
     echo "✗ Warning: Claude CLI not found in PATH"
+    echo "  Creating mock Claude CLI for development..."
+
+    # Fallback: Mock CLI 생성
+    cat > /usr/local/bin/claude << 'EOF'
+#!/bin/bash
+# Mock Claude CLI for development/testing
+# 실제 Claude Code CLI 형식: claude -p "프롬프트"
+
+# 인자 파싱
+case "$1" in
+  -p)
+    # -p 옵션: 프롬프트를 받아서 코드 분석
+    # 실제로는 $2에 프롬프트가 전달됨
+    echo '{"score": 85, "summary": "Mock Claude inspection result", "issues": [], "strengths": ["Well-structured code", "Good error handling"], "recommendations": ["Add more tests", "Improve documentation"]}'
+    exit 0
+    ;;
+  --version|-v)
+    # 버전 출력
+    echo "Claude Code CLI Mock v1.0.0"
+    exit 0
+    ;;
+  --help|-h)
+    # 도움말
+    echo "Mock Claude Code CLI - Development Version"
+    echo "Usage: claude -p \"prompt\" [options]"
+    exit 0
+    ;;
+  *)
+    # 기본값 - 에러 메시지
+    echo "Error: Please use -p option to provide a prompt" >&2
+    echo "Usage: claude -p \"prompt\"" >&2
+    exit 1
+    ;;
+esac
+EOF
+    chmod +x /usr/local/bin/claude
+    echo "  Mock Claude CLI created at /usr/local/bin/claude"
 fi
 
 # Codex CLI 설치
@@ -62,6 +99,43 @@ if command -v codex &> /dev/null; then
     echo "  Version: $(codex --version 2>&1 || echo 'unknown')"
 else
     echo "✗ Warning: Codex CLI not found in PATH"
+    echo "  Creating mock Codex CLI for development..."
+
+    # Fallback: Mock CLI 생성
+    cat > /usr/local/bin/codex << 'EOF'
+#!/bin/bash
+# Mock Codex CLI for development/testing
+# Codex CLI 형식 (Claude와 유사): codex -p "프롬프트"
+
+# 인자 파싱
+case "$1" in
+  -p)
+    # -p 옵션: 프롬프트를 받아서 코드 검사
+    # 실제로는 $2에 프롬프트가 전달됨
+    echo '{"score": 88, "summary": "Mock Codex inspection result", "issues": [{"severity": "low", "category": "style", "file": "test.py", "line": 10, "description": "Line too long", "recommendation": "Break into multiple lines"}], "strengths": ["Good documentation", "Clear naming", "Well-tested"], "recommendations": ["Consider adding type hints", "Improve error messages"]}'
+    exit 0
+    ;;
+  --version|-v)
+    # 버전 출력
+    echo "Codex CLI Mock v1.0.0"
+    exit 0
+    ;;
+  --help|-h)
+    # 도움말
+    echo "Mock Codex CLI - Development Version"
+    echo "Usage: codex -p \"prompt\" [options]"
+    exit 0
+    ;;
+  *)
+    # 기본값 - 에러 메시지
+    echo "Error: Please use -p option to provide a prompt" >&2
+    echo "Usage: codex -p \"prompt\"" >&2
+    exit 1
+    ;;
+esac
+EOF
+    chmod +x /usr/local/bin/codex
+    echo "  Mock Codex CLI created at /usr/local/bin/codex"
 fi
 
 echo ""
