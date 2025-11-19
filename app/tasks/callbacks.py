@@ -32,6 +32,7 @@ class CallbackService:
         status: str,
         github_url: str,
         branch: str,
+        ai_provider: str,
         result: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None,
         error_type: Optional[str] = None,
@@ -46,6 +47,7 @@ class CallbackService:
             status: 작업 상태 (success/failed)
             github_url: GitHub 저장소 URL
             branch: 브랜치 이름
+            ai_provider: 사용된 AI 제공자
             result: 검사 결과
             error: 에러 메시지
             error_type: 에러 타입
@@ -59,6 +61,7 @@ class CallbackService:
             status=status,
             github_url=github_url,
             branch=branch,
+            ai_provider=ai_provider,
             result=result,
             error=error,
             error_type=error_type,
@@ -125,18 +128,20 @@ class CallbackService:
 
         Args:
             *args, **kwargs: send_callback과 동일한 인자
+
+        Note:
+            Celery worker는 동기 컨텍스트에서 실행되므로
+            새 이벤트 루프를 생성하여 비동기 함수를 실행합니다.
         """
         import asyncio
 
+        # 새 이벤트 루프 생성 및 실행
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            # 이벤트 루프가 있는 경우
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 이미 실행 중인 루프가 있으면 새 태스크 생성
-                asyncio.create_task(self.send_callback(*args, **kwargs))
-            else:
-                # 루프가 없으면 새로 실행
-                loop.run_until_complete(self.send_callback(*args, **kwargs))
-        except RuntimeError:
-            # 이벤트 루프가 없는 경우 새로 생성
-            asyncio.run(self.send_callback(*args, **kwargs))
+            loop.run_until_complete(self.send_callback(*args, **kwargs))
+        except Exception as e:
+            logger.exception("sync_callback_execution_failed", error=str(e))
+            raise
+        finally:
+            loop.close()

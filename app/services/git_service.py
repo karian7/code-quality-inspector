@@ -107,6 +107,60 @@ class GitService:
         except Exception as e:
             logger.warning("cleanup_failed", path=str(directory), error=str(e))
 
+    def cleanup_old_directories(self, max_age_hours: int = 24) -> None:
+        """
+        오래된 임시 디렉토리 정리
+
+        Worker가 비정상 종료되어 남은 디렉토리를 정리합니다.
+
+        Args:
+            max_age_hours: 최대 보존 시간 (시간 단위, 기본 24시간)
+        """
+        import time
+
+        work_dir = settings.work_dir
+        if not work_dir.exists():
+            logger.info("work_directory_not_found", path=str(work_dir))
+            return
+
+        current_time = time.time()
+        cleaned_count = 0
+
+        try:
+            for item in work_dir.iterdir():
+                if item.is_dir():
+                    # 생성 시간 확인
+                    try:
+                        age_seconds = current_time - item.stat().st_mtime
+                        age_hours = age_seconds / 3600
+
+                        if age_hours > max_age_hours:
+                            logger.info(
+                                "cleaning_old_directory",
+                                path=str(item),
+                                age_hours=round(age_hours, 2),
+                            )
+                            self.cleanup_directory(item)
+                            cleaned_count += 1
+                    except Exception as e:
+                        logger.warning(
+                            "failed_to_check_directory_age",
+                            path=str(item),
+                            error=str(e),
+                        )
+
+            if cleaned_count > 0:
+                logger.info(
+                    "old_directories_cleaned",
+                    count=cleaned_count,
+                    max_age_hours=max_age_hours,
+                )
+            else:
+                logger.info("no_old_directories_to_clean", max_age_hours=max_age_hours)
+
+        except Exception as e:
+            logger.exception("cleanup_old_directories_failed", error=str(e))
+
     def get_repository_info(self, repo_path: Path) -> dict:
         """
         저장소 정보 조회

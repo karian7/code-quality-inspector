@@ -111,26 +111,34 @@ def inspect_code_task(
 
     except GitCloneException as e:
         logger.error("git_clone_failed", task_id=task_id, error=str(e))
-        # 콜백 전송 (실패)
-        try:
-            callback_service.send_callback_sync(
-                callback_url=callback_url,
-                task_id=task_id,
-                status="failed",
-                github_url=github_url,
-                branch=branch,
-                ai_provider=ai_provider,
-                error=str(e),
-                error_type="git_clone_error",
-                metadata=metadata,
-            )
-        except Exception as callback_error:
-            logger.exception("callback_failed_after_git_error", error=str(callback_error))
 
-        raise
+        # Git clone 실패는 일시적 네트워크 오류일 수 있으므로 재시도
+        try:
+            # 재시도 전 콜백 전송은 하지 않음 (재시도 중이므로)
+            logger.info("retrying_git_clone", task_id=task_id, retry_count=self.request.retries)
+            raise self.retry(exc=e, countdown=60, max_retries=3)
+        except self.MaxRetriesExceededError:
+            # 최대 재시도 횟수 초과 시 콜백 전송
+            logger.error("max_retries_exceeded_git_clone", task_id=task_id)
+            try:
+                callback_service.send_callback_sync(
+                    callback_url=callback_url,
+                    task_id=task_id,
+                    status="failed",
+                    github_url=github_url,
+                    branch=branch,
+                    ai_provider=ai_provider,
+                    error=str(e),
+                    error_type="git_clone_error",
+                    metadata=metadata,
+                )
+            except Exception as callback_error:
+                logger.exception("callback_failed_after_git_error", error=str(callback_error))
+            raise
 
     except RuleLoadException as e:
         logger.error("rule_load_failed", task_id=task_id, error=str(e))
+        # 규칙 파일 로드 실패는 설정 문제이므로 재시도하지 않음
         # 콜백 전송 (실패)
         try:
             callback_service.send_callback_sync(
@@ -147,7 +155,8 @@ def inspect_code_task(
         except Exception as callback_error:
             logger.exception("callback_failed_after_rule_error", error=str(callback_error))
 
-        raise
+        # 재시도하지 않고 종료
+        return {"error": str(e), "error_type": "rule_load_error", "retryable": False}
 
     except APIKeyMissingException as e:
         logger.error("api_key_missing", task_id=task_id, ai_provider=ai_provider, error=str(e))
@@ -167,47 +176,62 @@ def inspect_code_task(
         except Exception as callback_error:
             logger.exception("callback_failed_after_api_key_error", error=str(callback_error))
 
-        raise
+        # API 키 누락은 재시도해도 실패하므로 재시도하지 않음
+        return {"error": str(e), "error_type": "api_key_missing", "retryable": False}
 
     except AICliException as e:
         logger.error("ai_cli_failed", task_id=task_id, ai_provider=ai_provider, error=str(e))
-        # 콜백 전송 (실패)
-        try:
-            callback_service.send_callback_sync(
-                callback_url=callback_url,
-                task_id=task_id,
-                status="failed",
-                github_url=github_url,
-                branch=branch,
-                ai_provider=ai_provider,
-                error=str(e),
-                error_type="inspection_error",
-                metadata=metadata,
-            )
-        except Exception as callback_error:
-            logger.exception("callback_failed_after_ai_cli_error", error=str(callback_error))
 
-        raise
+        # AI CLI 실패는 일시적 오류일 수 있으므로 재시도
+        try:
+            # 재시도 전 콜백 전송은 하지 않음 (재시도 중이므로)
+            logger.info("retrying_ai_cli", task_id=task_id, retry_count=self.request.retries)
+            raise self.retry(exc=e, countdown=60, max_retries=3)
+        except self.MaxRetriesExceededError:
+            # 최대 재시도 횟수 초과 시 콜백 전송
+            logger.error("max_retries_exceeded_ai_cli", task_id=task_id)
+            try:
+                callback_service.send_callback_sync(
+                    callback_url=callback_url,
+                    task_id=task_id,
+                    status="failed",
+                    github_url=github_url,
+                    branch=branch,
+                    ai_provider=ai_provider,
+                    error=str(e),
+                    error_type="inspection_error",
+                    metadata=metadata,
+                )
+            except Exception as callback_error:
+                logger.exception("callback_failed_after_ai_cli_error", error=str(callback_error))
+            raise
 
     except Exception as e:
         logger.exception("inspection_task_failed", task_id=task_id, error=str(e))
-        # 콜백 전송 (실패)
-        try:
-            callback_service.send_callback_sync(
-                callback_url=callback_url,
-                task_id=task_id,
-                status="failed",
-                github_url=github_url,
-                branch=branch,
-                ai_provider=ai_provider,
-                error=str(e),
-                error_type="unexpected_error",
-                metadata=metadata,
-            )
-        except Exception as callback_error:
-            logger.exception("callback_failed_after_unexpected_error", error=str(callback_error))
 
-        raise
+        # 예상치 못한 오류 - 일시적 문제일 수 있으므로 재시도
+        try:
+            # 재시도 전 콜백 전송은 하지 않음 (재시도 중이므로)
+            logger.info("retrying_unexpected_error", task_id=task_id, retry_count=self.request.retries)
+            raise self.retry(exc=e, countdown=60, max_retries=3)
+        except self.MaxRetriesExceededError:
+            # 최대 재시도 횟수 초과 시 콜백 전송
+            logger.error("max_retries_exceeded_unexpected", task_id=task_id)
+            try:
+                callback_service.send_callback_sync(
+                    callback_url=callback_url,
+                    task_id=task_id,
+                    status="failed",
+                    github_url=github_url,
+                    branch=branch,
+                    ai_provider=ai_provider,
+                    error=str(e),
+                    error_type="unexpected_error",
+                    metadata=metadata,
+                )
+            except Exception as callback_error:
+                logger.exception("callback_failed_after_unexpected_error", error=str(callback_error))
+            raise
 
     finally:
         # 정리: 임시 디렉토리 삭제

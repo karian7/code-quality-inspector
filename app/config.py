@@ -3,6 +3,7 @@
 pydantic-settings를 사용하여 환경 변수 자동 로드
 """
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 from typing import Optional
 from pathlib import Path
 import json
@@ -41,14 +42,20 @@ class Settings(BaseSettings):
 
     # Claude CLI 설정
     claude_cli_path: str = "claude"  # PATH에서 찾음
-    claude_api_key: Optional[str] = None  # ANTHROPIC_API_KEY
+    claude_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias="ANTHROPIC_API_KEY"
+    )
     claude_model: str = "claude-3-opus-20240229"
     claude_max_tokens: int = 4096
     claude_timeout: int = 600  # 10분
 
     # Codex CLI 설정
     codex_cli_path: str = "codex"  # PATH에서 찾음
-    codex_api_key: Optional[str] = None  # OPENAI_API_KEY
+    codex_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias="OPENAI_API_KEY"
+    )
     codex_model: str = "gpt-4"
     codex_max_tokens: int = 4096
     codex_timeout: int = 600  # 10분

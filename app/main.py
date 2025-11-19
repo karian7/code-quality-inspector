@@ -67,6 +67,14 @@ async def lifespan(app: FastAPI):
         if not settings.debug:
             raise RuntimeError(error_msg)
 
+    # 시작 시 오래된 임시 디렉토리 정리
+    try:
+        from app.services.git_service import GitService
+        git_service = GitService()
+        git_service.cleanup_old_directories(max_age_hours=24)
+    except Exception as e:
+        logger.warning("failed_to_cleanup_old_directories", error=str(e))
+
     yield
 
     # 종료
