@@ -31,7 +31,7 @@ def inspect_code_task(
     self,
     github_url: str,
     branch: str,
-    callback_url: str,
+    callback_url: Optional[str],
     rules_files: List[str],
     ai_provider: str = "codex",
     metadata: Optional[Dict[str, Any]] = None,
@@ -42,7 +42,7 @@ def inspect_code_task(
     Args:
         github_url: GitHub 저장소 URL
         branch: 브랜치 이름
-        callback_url: 결과 콜백 URL
+        callback_url: 결과 콜백 URL (None이면 로그만 기록)
         rules_files: 심사 규칙 파일 목록
         ai_provider: AI 제공자 ("claude" 또는 "codex")
         metadata: 추가 메타데이터

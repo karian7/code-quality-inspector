@@ -37,7 +37,7 @@ async def create_inspection(
             kwargs={
                 "github_url": str(request.github_url),
                 "branch": request.branch,
-                "callback_url": str(request.callback_url),
+                "callback_url": str(request.callback_url) if request.callback_url else None,
                 "rules_files": request.rules_files,
                 "ai_provider": request.ai_provider,
                 "metadata": request.metadata,

@@ -40,6 +40,17 @@ EOF
 # Claude Code 공식 설치
 curl -fsSL https://claude.ai/install.sh | bash
 
+# Claude CLI 심볼릭 링크 생성 (~/.local/bin/claude → /usr/bin/claude)
+if [ -f ~/.local/bin/claude ]; then
+    echo "Creating symbolic link: /usr/bin/claude → ~/.local/bin/claude"
+    ln -sf ~/.local/bin/claude /usr/bin/claude
+    echo "✓ Symbolic link created successfully"
+else
+    echo "✗ Warning: Claude CLI not found at ~/.local/bin/claude"
+    echo "  Installation may have failed or installed to a different location"
+fi
+
+
 # Claude CLI 설치 확인
 if command -v claude &> /dev/null; then
     echo "✓ Claude CLI installed successfully!"

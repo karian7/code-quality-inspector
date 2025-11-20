@@ -213,6 +213,10 @@ Please provide only the JSON output without any additional text or markdown form
                 prompt_length=len(prompt),
                 cmd_length=len(cmd),
             )
+            logger.info(
+                "executing_ai_cli_cmd",
+                cmd=cmd,
+            )
 
             # CLI 실행 (체크아웃 받은 디렉토리에서 실행 - 보안 샌드박스)
             result = subprocess.run(

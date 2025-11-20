@@ -17,17 +17,23 @@ class CallbackService:
     """콜백 전송 서비스"""
 
     def __init__(self):
-        self.timeout = settings.callback_timeout
+        # 세분화된 타임아웃 설정
+        self.timeout = httpx.Timeout(
+            connect=settings.callback_connect_timeout,
+            read=settings.callback_read_timeout,
+            write=settings.callback_write_timeout,
+            pool=settings.callback_pool_timeout,
+        )
         self.max_retries = settings.callback_max_retries
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(5),  # 재시도 횟수 증가 (3 → 5)
+        wait=wait_exponential(multiplier=2, min=4, max=30),  # 백오프 증가
         reraise=True,
     )
     async def send_callback(
         self,
-        callback_url: str,
+        callback_url: Optional[str],
         task_id: str,
         status: str,
         github_url: str,
@@ -42,7 +48,7 @@ class CallbackService:
         콜백 URL로 결과 전송
 
         Args:
-            callback_url: 콜백 URL
+            callback_url: 콜백 URL (None이면 로그만 기록)
             task_id: 작업 ID
             status: 작업 상태 (success/failed)
             github_url: GitHub 저장소 URL
@@ -56,6 +62,14 @@ class CallbackService:
         Raises:
             CallbackException: 콜백 전송 실패 시
         """
+        if not callback_url:
+            logger.info(
+                "callback_url_not_provided",
+                task_id=task_id,
+                status=status,
+            )
+            return
+
         payload = CallbackPayload(
             task_id=task_id,
             status=status,
@@ -108,11 +122,49 @@ class CallbackService:
                 },
             )
 
-        except httpx.TimeoutException:
-            logger.error("callback_timeout", url=callback_url, timeout=self.timeout)
+        except httpx.ConnectTimeout:
+            logger.error(
+                "callback_connect_timeout",
+                url=callback_url,
+                connect_timeout=settings.callback_connect_timeout,
+            )
             raise CallbackException(
-                f"Callback timed out after {self.timeout} seconds",
-                details={"url": callback_url, "timeout": self.timeout},
+                f"Connection to callback URL timed out after {settings.callback_connect_timeout}s (TLS handshake failed)",
+                details={
+                    "url": callback_url,
+                    "timeout_type": "connect",
+                    "timeout": settings.callback_connect_timeout,
+                },
+            )
+
+        except httpx.ReadTimeout:
+            logger.error(
+                "callback_read_timeout",
+                url=callback_url,
+                read_timeout=settings.callback_read_timeout,
+            )
+            raise CallbackException(
+                f"Callback server did not respond within {settings.callback_read_timeout}s",
+                details={
+                    "url": callback_url,
+                    "timeout_type": "read",
+                    "timeout": settings.callback_read_timeout,
+                },
+            )
+
+        except httpx.TimeoutException as e:
+            # 기타 타임아웃 (write, pool)
+            logger.error(
+                "callback_timeout",
+                url=callback_url,
+                timeout_type=type(e).__name__,
+            )
+            raise CallbackException(
+                f"Callback request timed out: {type(e).__name__}",
+                details={
+                    "url": callback_url,
+                    "timeout_type": type(e).__name__,
+                },
             )
 
         except Exception as e:

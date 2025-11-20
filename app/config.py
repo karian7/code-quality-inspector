@@ -72,7 +72,10 @@ class Settings(BaseSettings):
     api_keys: str = "[]"  # JSON string of API keys
 
     # 콜백 설정
-    callback_timeout: int = 30
+    callback_connect_timeout: int = 10  # TLS 연결 타임아웃
+    callback_read_timeout: int = 30     # 응답 대기 타임아웃
+    callback_write_timeout: int = 10    # 쓰기 타임아웃
+    callback_pool_timeout: int = 10     # 커넥션 풀 대기
     callback_max_retries: int = 3
 
     # 로깅 설정

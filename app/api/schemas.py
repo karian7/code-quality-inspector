@@ -21,9 +21,9 @@ class InspectionRequest(BaseModel):
         min_length=1,
         max_length=255,
     )
-    callback_url: HttpUrl = Field(
-        ...,
-        description="결과를 전송할 콜백 URL",
+    callback_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="결과를 전송할 콜백 URL (선택 사항, 미제공 시 로그만 기록)",
         examples=["https://api.example.com/webhook/inspection"],
     )
     rules_files: List[str] = Field(
