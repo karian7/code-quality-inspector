@@ -79,7 +79,7 @@ class CallbackService:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     callback_url,
-                    json=payload.model_dump(),
+                    json=payload.model_dump(mode='json'),  # mode='json'으로 datetime 자동 직렬화
                     headers={"Content-Type": "application/json"},
                 )
 
